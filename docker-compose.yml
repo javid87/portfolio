@@ -1,0 +1,98 @@
+version: '3.9'
+
+services:
+  # ==================================================
+  # Portfolio Web Application
+  # ==================================================
+  portfolio:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: javid-alizada-portfolio:latest
+    container_name: portfolio-app
+    restart: unless-stopped
+    
+    # Port mapping
+    ports:
+      - "3000:3000"
+    
+    # Environment variables
+    environment:
+      - NODE_ENV=production
+      - NEXT_TELEMETRY_DISABLED=1
+    
+    # Resource limits for production
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    
+    # Health check configuration
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+    
+    # Read-only root filesystem (optional, comment out if issues arise)
+    # read_only: true
+    
+    # Tmpfs for writable directories
+    tmpfs:
+      - /tmp:noexec,nosuid,size=64m
+    
+    # Network configuration
+    networks:
+      - portfolio-network
+
+  # ==================================================
+  # Nginx Reverse Proxy (Optional - for production)
+  # ==================================================
+  nginx:
+    image: nginx:alpine
+    container_name: portfolio-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      portfolio:
+        condition: service_healthy
+    networks:
+      - portfolio-network
+    profiles:
+      - production
+
+# ==================================================
+# Networks
+# ==================================================
+networks:
+  portfolio-network:
+    driver: bridge
+    name: portfolio-network
+
+# ==================================================
+# Volumes (for future use)
+# ==================================================
+volumes:
+  portfolio-data:
+    driver: local
